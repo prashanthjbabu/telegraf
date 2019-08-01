@@ -25,6 +25,7 @@ import (
 
 const defaultReadTimeout = time.Second * 5
 const ipMaxPacketSize = 64 * 1024
+const defaultSeverityLevel = 7 //Debug
 
 // Syslog is a syslog plugin
 type Syslog struct {
@@ -37,9 +38,9 @@ type Syslog struct {
 	Trailer         nontransparent.TrailerType
 	BestEffort      bool
 	Separator       string `toml:"sdparam_separator"`
-
-	now      func() time.Time
-	lastTime time.Time
+	SeverityLevel   int
+	now             func() time.Time
+	lastTime        time.Time
 
 	mu sync.Mutex
 	wg sync.WaitGroup
@@ -101,6 +102,9 @@ var sampleConfig = `
   ## For each combination a field is created.
   ## Its name is created concatenating identifier, sdparam_separator, and parameter name.
   # sdparam_separator = "_"
+
+  ## Severity level to filter by . Default is 7 which means Debug and above will be allowed
+  # severity_level = 3
 `
 
 // SampleConfig returns sample configuration message
@@ -235,7 +239,9 @@ func (s *Syslog) listenPacket(acc telegraf.Accumulator) {
 
 		message, err := p.Parse(b[:n])
 		if message != nil {
-			acc.AddFields("syslog", fields(message, s), tags(message), s.time())
+			if int(*message.Severity()) <= s.SeverityLevel {
+				acc.AddFields("syslog", fields(message, s), tags(message), s.time())
+			}
 		}
 		if err != nil {
 			acc.AddError(err)
@@ -349,7 +355,9 @@ func (s *Syslog) store(res syslog.Result, acc telegraf.Accumulator) {
 		acc.AddError(res.Error)
 	}
 	if res.Message != nil {
-		acc.AddFields("syslog", fields(res.Message, s), tags(res.Message), s.time())
+		if int(*res.Message.Severity()) <= s.SeverityLevel {
+			acc.AddFields("syslog", fields(res.Message, s), tags(res.Message), s.time())
+		}
 	}
 }
 
@@ -446,9 +454,10 @@ func init() {
 			ReadTimeout: &internal.Duration{
 				Duration: defaultReadTimeout,
 			},
-			Framing:   framing.OctetCounting,
-			Trailer:   nontransparent.LF,
-			Separator: "_",
+			Framing:       framing.OctetCounting,
+			Trailer:       nontransparent.LF,
+			Separator:     "_",
+			SeverityLevel: defaultSeverityLevel,
 		}
 	})
 }

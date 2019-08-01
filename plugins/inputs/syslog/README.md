@@ -58,6 +58,10 @@ Syslog messages should be formatted according to
   ## For each combination a field is created.
   ## Its name is created concatenating identifier, sdparam_separator, and parameter name.
   # sdparam_separator = "_"
+
+  ## Severity level to filter by . Default is 7 which means Debug and above will be allowed
+  # severity_level = 3
+
 ```
 
 #### Message transport
